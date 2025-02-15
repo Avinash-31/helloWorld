@@ -1,0 +1,154 @@
+Develop a generic data replication framework in jupyter notebook
+
+to transfer data from a Snowflake source table to an Iceberg target table with the following capabilities:
+
+Note : use spark for executing snowflake queries as well, and there should only be insert option in control table not update
+
+in snowflake
+
+source table
+
+control table(in control table there should only be insert no updatei.e new batchsk should be added)
+
+in iceberg
+
+iceberg table
+
+Tech Stack:
+Snowflake (source data warehouse)
+
+Iceberg (target table storage)
+
+Apache Spark & PySpark (ETL processing)
+
+SQL (querying and transformation)
+
+Core Features:
+Schema Handling: Support replication for tables of different schemas dynamically.
+
+Target Table Creation: If the Iceberg table doesn’t exist, create it based on the source table schema.
+
+Control Table Management:
+
+Maintain a control_table that tracks table names and batch_sk (batch sequence key).
+
+Update control_table before inserting into Iceberg.
+
+If the Iceberg insertion fails, revert the batch_sk update.
+
+Loading Strategies:
+
+Full Load
+
+Chunk Load
+
+Partition Load
+
+Bucketing
+
+Incremental Load
+
+Both buacket and paritioning
+Logging: Implement logging at each step to track progress and potential errors.
+
+Merge Strategy: Instead of simple insertions, provide configurable options for:
+
+Append
+
+Overwrite
+
+Merge (Upsert)
+
+Data Change Handling:
+
+Capture INSERT, UPDATE, and DELETE operations from Snowflake.
+
+Reflect these changes in Iceberg efficiently.
+
+Workflow Logic:
+Case 1: Initial Table Creation & Data Insertion
+Snowflake Source Table:
+
+The table is newly created, and new data is inserted with an increasing batch_sk (e.g., batch_sk = 1).
+Control Table Updates:
+
+If the table is not in control_table, insert an entry with batch_sk = 0.
+
+For new data, update control_table with batch_sk from Snowflake.
+
+Iceberg Table Processing:
+
+If Iceberg table does not exist, create it based on the schema of the source table.
+
+Insert only the data where batch_sk is between the previous max(batch_sk)(batchsk just greater then last batch sk of iceberg table) and the current max(batch_sk) (tracked via control_table).
+
+Case 2: Existing Table with New Data
+Snowflake Source Table:
+
+New data is inserted, updating batch_sk.
+Control Table Updates:
+
+Compare the latest batch_sk in Snowflake with control_table.
+
+If it's greater, insert the new batch_sk. Otherwise, alert the user.
+
+Iceberg Table Processing:
+
+Extract and insert data from Snowflake where batch_sk is between the current max(batch_sk) and the second max(batch_sk) from control_table.
+
+If the Iceberg insertion fails, rollback batch_sk in control_table.
+
+Configuration Requirements:
+All configurations (e.g., source & target tables, processing modes, logging levels) should be defined in a single notebook cell for easy reusability.
+
+Provide a way to dynamically adjust configurations without modifying core logic.
+
+Deliverables:
+
+PySpark-based script/notebook implementing this framework.
+
+Logging & error-handling mechanisms.
+
+SQL queries for control_table management.
+
+Data loading strategies with sample queries for verification.
+
+Working:
+
+Case 1 :
+
+Source table :
+
+When the table is created first time, and data is added with batch_sk that should incrementally be updated. 
+
+Example : let the batch_sk be 1 for 1 row insertion
+
+Control table :
+
+Whenever a data is added in snowflake table , the control table should be updated . 
+
+In the control table, as intitally there's no table name inserted it should automatically get inserted with table_name and batch_sk as 0,
+
+Then in control table for insertion in snowflake table, the batch_sk in control table should be checked and if the initial batch_sk in control table is less then the current batch_sk its goinf to add from the data inserted in source table, a new row is inserted with table_name and new batch_sk
+
+Iceberg table:
+
+the data loads into iceberg table(create a table acc to source table's schema if not exists) by inserting the rows that lie between max(batch_sk) of that source table and previous_batch_sk of that source table (these should be checked from control table) and upon checking , the data lying between these rows should be inserted into iceberg table
+
+Case 2 :
+
+Source table:
+
+When table already exists, and data is added to source table and new batchsk is updated along with it
+
+control table :
+
+Check with the batchsk of that source table and if less than the max batchsk of the added data in source table, insert that batchsk along with name in the control table. If it is not less than , then inform the use
+
+iceberg table :
+
+load data between the max(batchsk) and last batchsk(2nd largest batchsk) of that source table from control table and that particular data from  snowflake to iceberg
+
+NOTE : the control table should be updated before insertion to iceberg table itself and if the insertion to iceberg fails it should remove the added batch sk to control table
+
+the data between max(batchsk) and second max(batchsk) in control table should be added to iceberg table
