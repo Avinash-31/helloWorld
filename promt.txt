@@ -152,3 +152,63 @@ load data between the max(batchsk) and last batchsk(2nd largest batchsk) of that
 NOTE : the control table should be updated before insertion to iceberg table itself and if the insertion to iceberg fails it should remove the added batch sk to control table
 
 the data between max(batchsk) and second max(batchsk) in control table should be added to iceberg table
+
+
+
+
+
+ghgggjfg
+
+
+
+
+flowchart TD
+
+subgraph Snowflake
+    E1[Execute Snowflake Query: SELECT FROM sf_table_name LIMIT 1]
+    E2[Get Last Batch SK from Control Table using: SELECT MAX batch_sk_col]
+    E3[Get Max Batch SK from Snowflake Table]
+    E4[Fetch Distinct Batch SKs]
+    E5[Fetch Data from Snowflake using: SELECT * FROM sf_table_name WHERE batch_sk_col > last_batch_sk AND batch_sk_col <= max_batch_sk]
+end
+
+subgraph Iceberg
+    I1[Create Iceberg Table from Snowflake]
+    I2[Create Iceberg Table with Partitioning and Bucketing Options]
+    I3[Write Data to Iceberg Table]
+    I4[Validate Row Count: SELECT COUNT * FROM Snowflake and Iceberg]
+    I5[Insert Batch SK into Control Table]
+end
+
+A[Start Replication] --> B{Check if Iceberg Table Exists}
+B -->|Yes| C[Validate Schema Logic]
+B -->|No| I1
+I1 --> E1
+E1 --> I2
+I2 --> I3
+C --> E2
+E2 --> I{Is Last Batch SK Provided?}
+I -->|Yes| J[Use Provided Last Batch SK]
+I -->|No| E2
+J --> E3
+E2 --> E3
+E3 --> E4
+E4 --> E5
+E5 --> I3
+I3 --> I4
+I4 --> P{Row Count Match?}
+P -->|Yes| I5
+P -->|No| R[Log Row Count Mismatch]
+R --> I5
+I5 --> S[Complete Replication Process]
+S --> T[End]
+
+subgraph Batch Processing direction LR
+    L1[Fetch Distinct Batch SKs] --> L2[Process Data in Chunks]
+    L2 --> L3[Write Data to Iceberg]
+    L3 --> L4[Validate Row Count for Each Batch]
+    L4 --> L5[Insert Batch SK into Control Table]
+end
+
+E3 --> L1
+L1 --> L2
