@@ -212,3 +212,77 @@ end
 
 E3 --> L1
 L1 --> L2
+
+
+
+
+hgdtwkkw
+
+digraph G {
+    subgraph cluster_Snowflake {
+        label = "Snowflake";
+        E1 [label="Execute Snowflake Query: SELECT FROM sf_table_name LIMIT 1"];
+        E2 [label="Get Last Batch SK from Control Table using: SELECT MAX batch_sk_col"];
+        E3 [label="Get Max Batch SK from Snowflake Table"];
+        E4 [label="Fetch Distinct Batch SKs"];
+        E5 [label="Fetch Data from Snowflake using: SELECT * FROM sf_table_name WHERE batch_sk_col > last_batch_sk AND batch_sk_col <= max_batch_sk"];
+    }
+
+    subgraph cluster_Iceberg {
+        label = "Iceberg";
+        I1 [label="Create Iceberg Table from Snowflake"];
+        I2 [label="Create Iceberg Table with Partitioning and Bucketing Options"];
+        I3 [label="Write Data to Iceberg Table"];
+        I4 [label="Validate Row Count: SELECT COUNT * FROM Snowflake and Iceberg"];
+        I5 [label="Insert Batch SK into Control Table"];
+    }
+
+    A [label="Start Replication"];
+    B [label="Check if Iceberg Table Exists"];
+    C [label="Validate Schema Logic"];
+    J [label="Use Provided Last Batch SK"];
+    R [label="Log Row Count Mismatch"];
+    S [label="Complete Replication Process"];
+    T [label="End"];
+    P [label="Row Count Match?"];
+    I [label="Is Last Batch SK Provided?"];
+
+    A -> B;
+    B -> C [label="Yes"];
+    B -> I1 [label="No"];
+    I1 -> E1;
+    E1 -> I2;
+    I2 -> I3;
+    C -> E2;
+    E2 -> I;
+    I -> J [label="Yes"];
+    I -> E2 [label="No"];
+    J -> E3;
+    E2 -> E3;
+    E3 -> E4;
+    E4 -> E5;
+    E5 -> I3;
+    I3 -> I4;
+    I4 -> P;
+    P -> I5 [label="Yes"];
+    P -> R [label="No"];
+    R -> I5;
+    I5 -> S;
+    S -> T;
+
+    subgraph cluster_Batch_Processing {
+        label = "Batch Processing";
+        L1 [label="Fetch Distinct Batch SKs"];
+        L2 [label="Process Data in Chunks"];
+        L3 [label="Write Data to Iceberg"];
+        L4 [label="Validate Row Count for Each Batch"];
+        L5 [label="Insert Batch SK into Control Table"];
+        L1 -> L2;
+        L2 -> L3;
+        L3 -> L4;
+        L4 -> L5;
+    }
+
+    E3 -> L1;
+    L1 -> L2;
+}
